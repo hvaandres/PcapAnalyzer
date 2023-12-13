@@ -1,0 +1,22 @@
+2016-04-14 11:28:39 - URL: / 
+2016-04-14 11:28:39 - 
+2016-04-14 11:28:51 - URL: /sqlInjection.php User: uvu 
+2016-04-14 11:28:39 - Source IP: 161.28.112.43, Destination IP: 161.28.112.66 - 
+2016-04-14 11:28:51 - Source IP: 161.28.112.66, Destination IP: 161.28.112.43 - URL: /sqlInjection.php User: uvu 
+2016-04-14 11:28:39 - Source IP: 161.28.112.43, Destination IP: 161.28.112.66 - 
+2016-04-14 11:28:51 - Source IP: 161.28.112.66, Destination IP: 161.28.112.43 - URL: /sqlInjection.php User: uvu Port(s) Reported: username=uvu%27+or+%27a%27%3D%27a&submit=Submit
+2016-04-14 11:28:39 - Source IP: 161.28.112.66, Destination IP: 161.28.112.43 - Type: GET, URL: / 
+2016-04-14 11:28:39 - Source IP: 161.28.112.43, Destination IP: 161.28.112.66 - Status: 200 
+2016-04-14 11:28:51 - Source IP: 161.28.112.66, Destination IP: 161.28.112.43 - Type: POST, URL: /sqlInjection.php User: uvu 
+2016-04-14 11:28:39 - Source IP: 161.28.112.66, Destination IP: 161.28.112.43 - Protocol: 6, Type: GET, URL: / 
+2016-04-14 11:28:39 - Source IP: 161.28.112.43, Destination IP: 161.28.112.66 - Status: 200 
+2016-04-14 11:28:51 - Source IP: 161.28.112.66, Destination IP: 161.28.112.43 - Protocol: 6, Type: POST, URL: /sqlInjection.php User: uvu 
+2016-04-14 11:28:39 - Source IP: 161.28.112.66, Destination IP: 161.28.112.43 - Protocol: 6, Type: GET, URL: / Host: www.sql.net User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:43.0) Gecko/20100101 Firefox/43.0 Iceweasel/43.0.4 Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8 
+2016-04-14 11:28:39 - Source IP: 161.28.112.43, Destination IP: 161.28.112.66 - Status: 200 
+2016-04-14 11:28:51 - Source IP: 161.28.112.66, Destination IP: 161.28.112.43 - Protocol: 6, Type: POST, URL: /sqlInjection.php User: uvu Host: www.sql.net User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:43.0) Gecko/20100101 Firefox/43.0 Iceweasel/43.0.4 Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8 Referer: http://www.sql.net/ 
+2016-04-14 11:28:39 - Source IP: 161.28.112.66, Destination IP: 161.28.112.43 - Protocol: 6, Type: GET, URL: / Host: www.sql.net User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:43.0) Gecko/20100101 Firefox/43.0 Iceweasel/43.0.4 Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8 
+2016-04-14 11:28:39 - Source IP: 161.28.112.43, Destination IP: 161.28.112.66 - Status: 200 
+2016-04-14 11:28:51 - Source IP: 161.28.112.66, Destination IP: 161.28.112.43 - Protocol: 6, Type: POST, URL: /sqlInjection.php User: uvu Host: www.sql.net User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:43.0) Gecko/20100101 Firefox/43.0 Iceweasel/43.0.4 Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8 Referer: http://www.sql.net/ 
+2016-04-14 11:28:39 - Source IP: 161.28.112.66, Destination IP: 161.28.112.43 - Protocol: 6, Type: GET, URL: / Host: www.sql.net User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:43.0) Gecko/20100101 Firefox/43.0 Iceweasel/43.0.4 Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8 
+2016-04-14 11:28:39 - Source IP: 161.28.112.43, Destination IP: 161.28.112.66 - Status: 200 
+2016-04-14 11:28:51 - Source IP: 161.28.112.66, Destination IP: 161.28.112.43 - Protocol: 6, Type: POST, URL: /sqlInjection.php User: uvu Host: www.sql.net User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:43.0) Gecko/20100101 Firefox/43.0 Iceweasel/43.0.4 Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8 Referer: http://www.sql.net/ 
