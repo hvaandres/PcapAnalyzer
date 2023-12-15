@@ -1,0 +1,16 @@
+Report:
+
+Source IP: 123.456.789.0
+Destination IP: 987.654.321.0
+Host: example.com
+Type of vulnerability: SQL Injection
+Description of the problem: A vulnerability allowing unauthorized SQL queries.
+
+Possible Solutions:
+- Apply input validation for user inputs.
+- Use parameterized queries to prevent SQL injection.
+- Regularly update and patch database software.
+
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36
+Request Type: GET
+Is Successful: True
