@@ -86,7 +86,7 @@ if __name__ == "__main__":
     pcap_file_path = '[your_pcap_file.pcap]'
     
     # Define the report file
-    report_file_path = '/Users/hvaandres/Documents/Git/security/line1-20.txt'
+    report_file_path = '[file_name].txt]'
     
     # Analyze the pcap file for HTTP GET and POST requests in lines 1 to 20
     main(pcap_file_path, report_file_path)
