@@ -1,3 +1,11 @@
+"""
+This script generates explanations for the outputs of a network intrusion detection system (NIDS).
+It uses the GPT-3 API to generate explanations for the outputs.
+It then extracts relevant information from the GPT-3 response and formats it as a detailed report.
+Created by Andres Haro, 2023. 
+
+"""
+
 import openai
 import os
 
