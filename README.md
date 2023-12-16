@@ -1,6 +1,21 @@
 # PcapAnalyzer
 Welcome to PcapAnalyzer, a comprehensive toolkit for working with pcap files, which are commonly used to store network traffic captures. This repository provides a suite of tools designed to analyze, inspect, and extract insights from packet capture files. Whether you are a network security professional, a system administrator, or a developer working on network-related projects, PcapAnalyzer equips you with the essential utilities to streamline your pcap file analysis workflow.
 
+Also, I added OpenAI's GPT-3 model to generate a report for the pcap file. The report is generated in the form of a text file. The report contains the following information:
+
+- Source IP
+- Destination IP
+- Host: [URL, IP]
+- Type of vulnerability: [if any]
+- Description of the problem: [if any]
+- Possible Solutions: [if any]
+- User-Agent: [Browser, OS, Device]
+- Request Type: [Get, Post, Put, Delete]
+- Is Successful: [yes, no]
+
+
+
+
 ## Key Features:
 - Packet Inspection: Dive deep into network packets to examine headers, payloads, and other relevant information.
 
@@ -17,8 +32,13 @@ Welcome to PcapAnalyzer, a comprehensive toolkit for working with pcap files, wh
 ## Getting Started:
 To get started, clone the repository and explore the documentation for detailed instructions on installing, configuring, and utilizing the tools provided by PcapAnalyzer.
 
+Get an account on OpenAI's GPT-3 API and add the API key to the code. You can get an account here: https://beta.openai.com/. You can also use the free version of the API.
+
+
 ## Installation:
 - Install Scapy: `pip install scapy`
+- Install OpenAI's API: `pip install openai`
+- Add the API key to the code.
 
 ## Things to change in the code:
 - Change the path to the pcap file in the code.
