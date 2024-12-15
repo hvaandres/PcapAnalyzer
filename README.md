@@ -13,8 +13,15 @@ Also, I added OpenAI's GPT-3 model to generate a report for the pcap file. The r
 - Request Type: [Get, Post, Put, Delete]
 - Is Successful: [yes, no]
 
+In this project, we are utilizing two different AI models for text generation and analysis. The setup is as follows:
 
+## Main Branch: OpenAI
 
+- On the main branch, the project uses OpenAI's API to generate responses, explanations, and solutions. This integration allows the system to process network intrusion detection data and generate detailed reports based on the AI's analysis.
+
+## Dev Branch: GEMINI (Google's Generative AI)
+
+- In the dev branch, we are using GEMINI, a generative AI model from Google, to handle the same tasks. GEMINI is used for analyzing network packets and generating explanations or security solutions based on the packet data. The dev branch allows you to test and compare the performance and accuracy of GEMINI against OpenAI.
 
 ## Key Features:
 - Packet Inspection: Dive deep into network packets to examine headers, payloads, and other relevant information.
@@ -33,6 +40,8 @@ Also, I added OpenAI's GPT-3 model to generate a report for the pcap file. The r
 To get started, clone the repository and explore the documentation for detailed instructions on installing, configuring, and utilizing the tools provided by PcapAnalyzer.
 
 Get an account on OpenAI's GPT-3 API and add the API key to the code. You can get an account here: https://beta.openai.com/. You can also use the free version of the API.
+
+Get an account on GCLOUD and enable Gemini API and make sure you get a token to connect your script with this API. 
 
 
 ## Installation:
@@ -57,6 +66,23 @@ for packet in packets[:20]:
 - FilterUtility: Efficiently filter and sort pcap files based on specific criteria.
 
 - ExtractionWizard: Extract files, data, or metadata from pcap captures.
+
+# Getting the API Keys
+
+## OpenAI API Key
+
+- Visit OpenAI's website and create an account if you don't already have one.
+- After signing in, go to the API Keys page in your OpenAI dashboard.
+- Click on Create new secret key to generate your API key.
+- Save this key securely, and add it to your .env file with the variable name OPENAI_API_KEY.
+
+## GEMINI API Key
+
+- Go to Google Cloud Console.
+- Create a new project or select an existing one.
+- Navigate to the API & Services section, and then to Credentials.
+- Create a new API key or use an existing one, and make sure to enable the Gemini API service.
+- Add the key to your .env file under the variable name GEMINI_API_KEY.
 
 ## Contributing:
 Contributions to PcapAnalyzer are welcome! Feel free to submit bug reports, feature requests, or even pull requests to enhance the functionality of this pcap analysis toolkit.
