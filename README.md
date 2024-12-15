@@ -84,6 +84,6 @@ for packet in packets[:20]:
 - Create a new API key or use an existing one, and make sure to enable the Gemini API service.
 - Add the key to your .env file under the variable name GEMINI_API_KEY.
 
-## Contributing:
+# Contributing:
 Contributions to PcapAnalyzer are welcome! Feel free to submit bug reports, feature requests, or even pull requests to enhance the functionality of this pcap analysis toolkit.
 
