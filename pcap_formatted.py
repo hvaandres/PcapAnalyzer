@@ -1,118 +1,153 @@
-"""
-This script generates explanations for the outputs of a network intrusion detection system (NIDS).
-It uses the GPT-3 API to generate explanations for the outputs.
-It then extracts relevant information from the GPT-3 response and formats it as a detailed report.
-Created by Andres Haro, 2023. 
-
-"""
-
 import openai
+from dotenv import load_dotenv
 import os
+import re
 
-# Set your OpenAI API key
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# Load environment variables from .env
+load_dotenv()
 
-# Function to generate explanation for a given output
+# API Key check with more informative error message
+api_key = os.getenv("OPENAI_API_KEY")
+if not api_key:
+    raise ValueError("OPENAI_API_KEY environment variable not set.  Please create a .env file and add it.")
+
+client = openai.OpenAI(api_key=api_key)
+
 def generate_explanation(output_text):
-    prompt = f"Explain the following output:\n{output_text}"
-    response = openai.Completion.create(
-        engine="text-davinci-003",
-        prompt=prompt,
-        max_tokens=800  # Adjust as needed
-    )
-    return response.choices[0].text.strip()
+    prompt = f"Explain the following network security log:\n{output_text}"
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4",  # Use "gpt-3.5-turbo" if GPT-4 is unavailable
+            messages=[
+                {"role": "system", "content": "You are an AI that explains cybersecurity logs.  Be concise and focus on key details."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=800,
+            temperature=0.2 # Lower temperature for more deterministic and factual responses
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:  # Catch any exception
+        print(f"Error communicating with OpenAI API: {e}")  # Print the error for debugging
+        return None
 
-# Function to extract information from the GPT-3 response
 def extract_information(gpt_response):
-    # Implement your logic to extract relevant information
-    # Example: You might use regex or keyword-based extraction
-    source_ip = "123.456.789.0"
-    destination_ip = "987.654.321.0"
-    host = "example.com"
-    vulnerability_type = "SQL Injection"
-    description = "A vulnerability allowing unauthorized SQL queries."
-    user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    request_type = "GET"
-    is_successful = True  # Set based on your logic
+    if not gpt_response:  # Handle cases where GPT API call failed
+        return {}
 
-    return {
-        "Source IP": source_ip,
-        "Destination IP": destination_ip,
-        "Host": host,
-        "Type of vulnerability": vulnerability_type,
-        "Description of the problem": description,
-        "User-Agent": user_agent,
-        "Request Type": request_type,
-        "Is Successful": is_successful,
-    }
+    information = {}
 
-# Function to dynamically generate solutions based on the vulnerability
+    # Use regular expressions for more robust extraction (examples)
+    match = re.search(r"Source IP:\s*(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})", gpt_response)
+    if match:
+        information["Source IP"] = match.group(1)
+
+    match = re.search(r"Destination IP:\s*(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})", gpt_response)
+    if match:
+        information["Destination IP"] = match.group(1)
+
+    match = re.search(r"Host:\s*([\w.-]+)", gpt_response)
+    if match:
+        information["Host"] = match.group(1)
+
+    match = re.search(r"Vulnerability Type:\s*(.+)", gpt_response, re.IGNORECASE) # Case insensitive
+    if match:
+        information["Type of vulnerability"] = match.group(1).strip()
+
+    match = re.search(r"User-Agent:\s*(.+)", gpt_response)
+    if match:
+        information["User-Agent"] = match.group(1).strip()
+
+    match = re.search(r"Request Type:\s*(.+)", gpt_response)
+    if match:
+        information["Request Type"] = match.group(1).strip()
+
+    match = re.search(r"Status Code:\s*(\d{3})", gpt_response)
+    if match:
+        information["Status Code"] = match.group(1).strip()
+
+    # ... (Add more regex extractions for other fields)
+
+    # Default values if not found
+    information.setdefault("Source IP", "N/A")
+    information.setdefault("Destination IP", "N/A")
+    information.setdefault("Host", "N/A")
+    information.setdefault("Type of vulnerability", "N/A")
+    information.setdefault("User-Agent", "N/A")
+    information.setdefault("Request Type", "N/A")
+    information.setdefault("Status Code", "N/A")
+    # ... set defaults for other fields
+
+    return information
+
+
 def generate_solutions(vulnerability_type):
-    if vulnerability_type == "SQL Injection":
-        return [
-            "Apply input validation for user inputs.",
-            "Use parameterized queries to prevent SQL injection.",
-            "Regularly update and patch database software.",
-        ]
-    elif vulnerability_type == "XSS":
-        return [
-            "Encode user input before rendering it in HTML.",
-            "Implement Content Security Policy (CSP) headers.",
-            "Use secure coding practices to validate and sanitize input.",
-        ]
-    # Add more cases for other vulnerability types as needed
-    else:
-        return ["Implement best practices for securing web applications."]
+    solutions_dict = {  # More comprehensive solutions
+        "SQL Injection": [
+            "Use parameterized queries or prepared statements.",
+            "Implement input validation and sanitization.",
+            "Apply least privilege principles to database accounts.",
+            "Use a Web Application Firewall (WAF)."
+        ],
+        "Cross-Site Scripting (XSS)": [ # Corrected name
+            "Encode output using context-appropriate escaping functions (e.g., HTML escaping).",
+            "Implement Content Security Policy (CSP).",
+            "Use HTTP-only cookies to mitigate XSS-based cookie theft.",
+            "Sanitize user input by removing or escaping potentially dangerous characters."
+        ],
+        "Default": ["Implement secure coding practices.", "Regularly patch and update systems.", "Conduct security audits and penetration testing."]
+    }
+    # Handle variations in vulnerability type casing
+    vulnerability_type = vulnerability_type.lower()
+    for key in solutions_dict:
+        if key.lower() == vulnerability_type:
+            return solutions_dict[key]
+    return solutions_dict["Default"]
 
-# Function to format the information as a detailed report
+
 def format_report(information):
-    report = f"Report:\n\n"
-    report += f"Source IP: {information['Source IP']}\n"
-    report += f"Destination IP: {information['Destination IP']}\n"
-    report += f"Host: {information['Host']}\n"
-    report += f"Type of vulnerability: {information['Type of vulnerability']}\n"
-    report += f"Description of the problem: {information['Description of the problem']}\n"
+    report = "Report:\n\n"
+    for key, value in information.items():  # Dynamic report generation
+        report += f"{key}: {value}\n"
+
     report += "\nPossible Solutions:\n"
-    # Dynamically generate solutions based on the vulnerability
-    solutions = generate_solutions(information['Type of vulnerability'])
+    solutions = generate_solutions(information.get("Type of vulnerability", "Default")) # Handle missing type
     for solution in solutions:
         report += f"- {solution}\n"
-    report += f"\nUser-Agent: {information['User-Agent']}\n"
-    report += f"Request Type: {information['Request Type']}\n"
-    report += f"Is Successful: {information['Is Successful']}\n"
 
     return report
 
-# Function to process and generate explanations for all files in a folder
+
 def process_folder(input_folder, output_folder):
-    # List all files in the input folder
-    input_files = os.listdir(input_folder)
-
-    # Process each file
-    for input_file in input_files:
+    for input_file in os.listdir(input_folder):
         input_file_path = os.path.join(input_folder, input_file)
-        output_file_path = os.path.join(output_folder, input_file)
+        output_file_path = os.path.join(output_folder, input_file + ".txt") # Add .txt extension
 
-        # Read the content of the input file
-        with open(input_file_path, 'r') as file:
-            input_text = file.read()
+        try:
+            with open(input_file_path, 'r', encoding="utf-8", errors="ignore") as file:
+                input_text = file.read()
 
-        # Generate explanation using GPT-3
-        explanation = generate_explanation(input_text)
+            explanation = generate_explanation(input_text)
 
-        # Extract information from the GPT-3 response
-        information = extract_information(explanation)
+            if explanation is None:  # Handle OpenAI API errors gracefully
+                print(f"Failed to generate explanation for {input_file}. Skipping.")
+                continue
 
-        # Format the information as a detailed report
-        report = format_report(information)
+            information = extract_information(explanation)
+            report = format_report(information)
 
-        # Save the report to the output file
-        with open(output_file_path, 'w') as file:
-            file.write(report)
+            with open(output_file_path, 'w', encoding="utf-8") as file:
+                file.write(report)
+
+        except Exception as e:  # Catch and report file processing errors
+            print(f"Error processing file {input_file}: {e}")
+
 
 # Input and output folder paths
-input_folder_path = "[your_input_folder_path]"
-output_folder_path = "[your_output_folder_path]"
+input_folder_path = "./pcap_file"  # Or wherever your pcap files are
+output_folder_path = "/Users/alanharo/Documents/GitHub/PcapAnalyzer/Better_Outputs" # Your output path
+
+# Ensure output folder exists
+os.makedirs(output_folder_path, exist_ok=True)
 
 # Process the folder and generate explanations
 process_folder(input_folder_path, output_folder_path)

@@ -83,10 +83,10 @@ def main(pcap_file, report_file):
 
 if __name__ == "__main__":
     # Replace 'your_pcap_file.pcap' with the actual pcap file you want to analyze
-    pcap_file_path = '[your_pcap_file.pcap]'
+    pcap_file_path = './pcap_file/IT6300FE.pcap'
     
     # Define the report file
-    report_file_path = '[file_name].txt]'
+    report_file_path = 'report.txt'
     
     # Analyze the pcap file for HTTP GET and POST requests in lines 1 to 20
     main(pcap_file_path, report_file_path)
