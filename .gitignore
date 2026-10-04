@@ -1,10 +1,12 @@
 ./Gemini-cred
 ./Gemini-cred/client_secret_799264981254-nspcaucnnpapn9r18j5vc8jiv7uh0ufo.apps.googleusercontent.com.json
 ./Gemini-cred/credentials.json
+.env/*
 .env
 .env.local
 .env.production
 .env.test
 ./Gemini-cred/*
 
-
+.venv/
+__pycache__/
