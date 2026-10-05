@@ -19,7 +19,7 @@ The final report (`Better_Outputs/<capture>_report.md`) is written for someone w
 - **SQL injection attempts:** one host sent payloads such as `uvu' or 'a'='a` to a web server's login forms.
 - **Brute-force login attack:** another host sent 14 login requests in one second with the User-Agent `Mozilla/5.0 (Hydra)`, a password-guessing tool.
 
-Each report contains an executive summary, severity-rated findings with the evidence behind them, a timeline, a host table, traffic and HTTP breakdowns, recommended actions, and a section on what the data cannot tell you. [Details below.](#the-final-report-better_outputs)
+The report follows a standard security-assessment layout: a header table (subject, date, overall risk), executive summary, scope and methodology, summary-of-findings table, detailed findings (ID, severity, affected hosts, description, evidence, impact, recommendation), timeline, hosts involved, prioritized recommendations, limitations, and appendices with the traffic and HTTP statistics. [Details below.](#the-final-report-better_outputs)
 
 ## Repository layout
 - `pcap_scanner.py` — Lists every IP packet (source, destination, protocol) in each capture.
@@ -135,12 +135,14 @@ The final report in `Better_Outputs/` is named after the capture (`IT6300FE_repo
 
 ## The final report (`Better_Outputs/`)
 `pcap_formatted.py` does not re-read the raw capture. It reads the two analyzed files for each capture and turns them into one Markdown report:
-- **Executive summary** and an **overall risk** rating.
-- **Key findings**, each with severity, the evidence that triggered it, and a recommended fix. Current rules: attack tools in the User-Agent (Hydra, sqlmap, Nikto, ...), SQL injection indicators (URL-decoded), repeated POSTs to one endpoint, and unencrypted HTTP carrying cookies or logins.
-- **What happened**: a timeline of activity windows (who talked to whom, when, how many requests).
-- **Hosts** with their role (web client / web server) and which ones attacked or were targeted.
-- **Traffic breakdown** and **HTTP activity** tables (protocols, busiest conversations, methods, sites, URLs, User-Agents).
-- **Recommended actions** and **Data notes and limits**, so you know what the data cannot tell you.
+- **Executive summary** and an **overall risk** rating, with a severity legend (High / Medium / Low / Informational).
+- **Findings** with IDs (F-01, F-02, ...), each with severity, affected hosts, description, evidence, impact and a recommended fix. Current rules: attack tools in the User-Agent (Hydra, sqlmap, Nikto, ...), SQL injection indicators (URL-decoded), repeated POSTs to one endpoint, and unencrypted HTTP carrying cookies or logins.
+- **Scope and methodology**, so a reader knows what was analyzed and how.
+- **Timeline of events**: activity windows (who talked to whom, when, how many requests).
+- **Hosts involved** with their role (web client / web server) and which ones attacked or were targeted.
+- **Recommendations** in priority order, tied back to finding IDs.
+- **Limitations**, so you know what the data cannot tell you.
+- **Appendices** with the traffic breakdown and HTTP activity tables (protocols, busiest conversations, methods, sites, URLs, User-Agents).
 
 Everything above except the narrative is computed locally and deterministically. Gemini only writes the executive summary, the plain-language timeline, extra recommendations and open questions, and it is told to use only the facts it is given. If it mentions an IP address that is not in your capture, its text is discarded.
 
@@ -151,12 +153,15 @@ python pcap_formatted.py --no-ai    # free, fully offline
 
 ### Limits to keep in mind
 - The findings are heuristics over text reports, not full packet inspection. SQL injection detection is substring matching on the URL-decoded request and can miss obfuscated payloads or flag harmless text.
-- The HTTP scanner keeps only packets containing a GET or POST, so most server responses are absent. The report can show that an attack was attempted, but usually not whether it succeeded.
+- The HTTP scanner keeps only GET, PUT, POST and DELETE requests, so most server responses are absent. The report can show that an attack was attempted, but usually not whether it succeeded.
 - Encrypted traffic (HTTPS) cannot be inspected; it only appears as TCP in the packet counts.
 - Passwords and cookie values are redacted by the scanner.
 
 ## Model choice and cost
 The AI step is built to stay cheap:
+- **Endpoint traffic only.** The AI sees just HTTP requests to an endpoint (`GET`, `PUT`, `POST`, `DELETE`): methods, URLs, the hosts involved, activity windows and the rule-based findings. Packet-level data (protocol mix, non-HTTP hosts, conversations) is analyzed locally and never sent.
+- **No endpoints, no AI call.** A capture with no such requests costs nothing; the report says the AI step was skipped.
+- **The full capture is still inspected, without AI.** Every packet is analyzed locally and shown in the report's tables; only the narrative is AI-written.
 - **One request per capture**, not per packet. It sends a compact digest of about 1,000 tokens instead of the raw packets.
 - It defaults to `gemini-3.1-flash-lite`, Google's cheapest generally-available tier.
 - "Thinking" is disabled, so you are never billed for reasoning tokens.

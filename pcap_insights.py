@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import unquote_plus
 
-from pcap_utils import SQL_PATTERNS
+from pcap_utils import ENDPOINT_METHODS, SQL_PATTERNS
 
 TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
@@ -126,7 +126,8 @@ class CaptureData:
 
     @property
     def requests(self) -> list[HttpEvent]:
-        return [event for event in self.events if event.is_request]
+        """Requests to an endpoint (GET/PUT/POST/DELETE): the only data the AI may see."""
+        return [event for event in self.events if event.method in ENDPOINT_METHODS]
 
 
 @dataclass
@@ -136,6 +137,8 @@ class Finding:
     detail: str
     evidence: list[str]
     recommendation: str
+    affected: list[str] = field(default_factory=list)
+    impact: str = ""
 
 
 @dataclass
@@ -402,6 +405,12 @@ def _detect_findings(requests: list[HttpEvent]) -> list[Finding]:
                     f"for the same period to see whether any attempt succeeded, and enforce "
                     f"account lockout and multi-factor authentication."
                 ),
+                affected=[src, dst],
+                impact=(
+                    f"If any guessed credential was valid, the attacker gained unauthorized access "
+                    f"to an account or application on {dst}. Even failed attempts can lock out "
+                    f"real users and load the server."
+                ),
             )
         )
 
@@ -429,6 +438,11 @@ def _detect_findings(requests: list[HttpEvent]) -> list[Finding]:
                     f"parameterized queries, validate input, and inspect database and web "
                     f"logs for unexpected logins or data access around that time."
                 ),
+                affected=[src, dst, *urls],
+                impact=(
+                    "A successful injection can bypass logins and expose, change or delete "
+                    "database contents, including user accounts and personal data."
+                ),
             )
         )
 
@@ -455,6 +469,11 @@ def _detect_findings(requests: list[HttpEvent]) -> list[Finding]:
                     f"Add rate limiting and account lockout to {url}, and review the "
                     f"authentication log on {dst} for failed logins from {src}."
                 ),
+                affected=[src, dst, url],
+                impact=(
+                    "Successful password guessing gives access to user accounts. Heavy "
+                    "repetition can also slow or disrupt the service."
+                ),
             )
         )
 
@@ -480,6 +499,11 @@ def _detect_findings(requests: list[HttpEvent]) -> list[Finding]:
                 recommendation=(
                     "Serve the application over HTTPS only, redirect HTTP to HTTPS, and mark "
                     "session cookies Secure and HttpOnly."
+                ),
+                affected=sorted({event.dst for event in requests}),
+                impact=(
+                    "Credentials, session cookies and form data can be intercepted and reused "
+                    "to impersonate users, and traffic can be modified in transit."
                 ),
             )
         )
@@ -529,10 +553,12 @@ def _build_limits(data: CaptureData, analysis_requests: list[HttpEvent], statuse
         limits.append("No pcap_http_analyzed report was found for this capture, so HTTP findings are missing.")
 
     if analysis_requests and sum(statuses.values()) < len(analysis_requests):
+        recorded = sum(statuses.values())
+        seen = "No server responses were" if not recorded else f"Only {recorded} server response(s) were"
         limits.append(
-            f"Only {sum(statuses.values())} server response status(es) were recorded for "
-            f"{len(analysis_requests)} request(s), because the HTTP scanner keeps only packets "
-            f"containing a GET or POST. Success or failure of requests is mostly unknown."
+            f"{seen} recorded for {len(analysis_requests)} request(s), because the HTTP scanner "
+            f"keeps only GET, PUT, POST and DELETE requests. Success or failure of requests is "
+            f"mostly unknown."
         )
 
     limits.extend(

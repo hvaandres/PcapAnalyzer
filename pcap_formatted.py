@@ -12,8 +12,11 @@ The report is still complete without the AI: if there is no API key, the API
 rejects the request, or ``--no-ai`` is given, the local sections are written
 and the report says why the AI sections are missing.
 
-Cost controls: cheapest Flash-Lite model by default, thinking disabled, output
-capped, and a single request per capture instead of one per packet.
+Cost controls: the AI only sees endpoint traffic (GET, PUT, POST, DELETE
+requests); the rest of the capture is analyzed locally for free, and a capture
+with no endpoint requests makes no AI call at all. On top of that: cheapest
+Flash-Lite model by default, thinking disabled, output capped, and a single
+request per capture instead of one per packet.
 
 Created by Andres Haro, 2026.
 """
@@ -28,6 +31,7 @@ import random
 import re
 import sys
 import time
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -80,7 +84,11 @@ SYSTEM_INSTRUCTION = (
     "hostnames, tools, dates or outcomes. The data usually cannot prove whether an "
     "attack succeeded; say so rather than guessing. Be specific: cite the IPs, URLs, "
     "counts and times from the facts. Use plain, short sentences. Do not explain "
-    "what protocols or headers are in general."
+    "what protocols or headers are in general. Never call a host or activity "
+    "'confirmed' malicious or an attack 'successful': the data only shows indicators "
+    "and attempts. The report already lists each finding's 'recommendation'; do NOT "
+    "repeat or rephrase those. 'recommendations' must contain only complementary "
+    "actions that add something new (at most 3), or be empty."
 )
 
 RESPONSE_SCHEMA = {
@@ -217,26 +225,29 @@ class Usage:
 
 
 def build_digest(data: CaptureData, analysis: Analysis) -> dict[str, Any]:
-    """Compact, factual summary of one capture: everything the model may use."""
+    """Compact summary of the endpoint (GET/PUT/POST/DELETE) traffic only.
+
+    Packet-level data (protocol mix, non-HTTP hosts, conversations) is analyzed
+    locally and deliberately left out: it costs tokens and the rules already
+    cover it.
+    """
+    endpoints = Counter((event.method, event.decoded_url) for event in data.requests)
+
     return {
         "capture": data.name,
         "totals": {
-            "ip_packets": analysis.packet_count,
-            "http_requests": analysis.request_count,
-            "hosts": len(analysis.hosts),
+            "endpoint_requests": analysis.request_count,
             "first_seen": analysis.first_seen.isoformat(sep=" ") if analysis.first_seen else None,
             "last_seen": analysis.last_seen.isoformat(sep=" ") if analysis.last_seen else None,
         },
-        "protocols": dict(analysis.protocols.most_common(8)),
         "hosts": [
-            {
-                "ip": host.ip,
-                "roles": host.roles,
-                "packets_sent": host.sent,
-                "packets_received": host.received,
-                "notes": host.notes,
-            }
-            for host in analysis.hosts[:10]
+            {"ip": host.ip, "roles": host.roles, "notes": host.notes}
+            for host in analysis.hosts
+            if host.roles != ["other"]
+        ][:10],
+        "endpoints": [
+            {"method": method, "url": url, "count": count}
+            for (method, url), count in endpoints.most_common(15)
         ],
         "activity_windows": [
             {
@@ -253,9 +264,7 @@ def build_digest(data: CaptureData, analysis: Analysis) -> dict[str, Any]:
         ],
         "http": {
             "methods": dict(analysis.methods),
-            "top_urls": [{"url": url, "count": count} for url, count in analysis.top_urls[:10]],
             "user_agents": dict(analysis.user_agents.most_common(5)),
-            "status_codes_recorded": dict(analysis.statuses),
         },
         "rule_based_findings": [
             {
@@ -263,10 +272,10 @@ def build_digest(data: CaptureData, analysis: Analysis) -> dict[str, Any]:
                 "title": finding.title,
                 "detail": finding.detail,
                 "evidence": finding.evidence[:4],
+                "recommendation": finding.recommendation,
             }
             for finding in analysis.findings
         ],
-        "data_limits": analysis.limits,
     }
 
 
@@ -377,6 +386,33 @@ def _when(value: datetime | None) -> str:
     return value.strftime("%Y-%m-%d %H:%M:%S") if value else "-"
 
 
+RISK_LABEL = {"HIGH": "High", "MEDIUM": "Medium", "LOW": "Low", "INFO": "Informational"}
+
+SEVERITY_MEANING = {
+    "HIGH": "Active attack or serious weakness. Act immediately.",
+    "MEDIUM": "Meaningful weakness or suspicious behavior. Fix soon.",
+    "LOW": "Minor weakness or hardening gap. Fix as part of routine work.",
+    "INFO": "For awareness only. No action required.",
+}
+
+
+def local_risk(analysis: Analysis) -> str:
+    """Overall risk from the most severe finding (used when there is no AI rating)."""
+    for severity in SEVERITY_ORDER:
+        if any(finding.severity == severity for finding in analysis.findings):
+            return RISK_LABEL[severity]
+    return "Informational"
+
+
+def local_rationale(analysis: Analysis, counts: dict[str, int]) -> str:
+    if not analysis.findings:
+        return "No findings were detected in the available data."
+    serious = [f"{counts[s]} {s.lower()}" for s in ("HIGH", "MEDIUM") if counts[s]]
+    if serious:
+        return "Rated on the most severe findings: " + " and ".join(serious) + "-severity finding(s)."
+    return "Only low-severity or informational findings were detected."
+
+
 def render_report(
     data: CaptureData,
     analysis: Analysis,
@@ -384,70 +420,144 @@ def render_report(
     ai_note: str,
     model: str,
 ) -> str:
+    """Write a standard security assessment report in Markdown."""
     out: list[str] = []
     add = out.append
 
-    sources = ", ".join(f"`{p.name}`" for p in (data.basic_file, data.http_file) if p) or "none"
     counts = {s: sum(1 for f in analysis.findings if f.severity == s) for s in SEVERITY_ORDER}
-
-    add("# Packet Capture Analysis Report")
-    add("")
-    add(f"- **Capture:** `{data.name}`")
-    add(f"- **Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-    add(f"- **Built from:** {sources}")
+    ids = {id(f): f"F-{n:02d}" for n, f in enumerate(analysis.findings, 1)}
+    risk = insights.overall_risk if insights and insights.overall_risk else local_risk(analysis)
+    rationale = (
+        insights.risk_rationale if insights and insights.risk_rationale else local_rationale(analysis, counts)
+    )
+    sources = ", ".join(f"`{p.name}`" for p in (data.basic_file, data.http_file) if p) or "none"
     short_note = ai_note.split(". ")[0].rstrip(".")
-    add(f"- **AI narrative:** {f'`{model}`' if insights else f'not included ({short_note})'}")
-    add("")
+    period = (
+        f"{_when(analysis.first_seen)} to {_when(analysis.last_seen)} (HTTP activity)"
+        if analysis.first_seen
+        else "Not available"
+    )
 
-    # ---- Summary ---------------------------------------------------------- #
-    add("## Executive summary")
+    # ---- Title block ------------------------------------------------------ #
+    add("# Network Security Assessment Report")
     add("")
-    if insights and insights.executive_summary:
-        add(insights.executive_summary)
-        if insights.overall_risk:
-            add("")
-            add(f"**Overall risk: {insights.overall_risk}.** {insights.risk_rationale}".strip())
-        add("")
-        add("*Summary written by the AI from the facts below.*")
-    else:
-        add(local_summary(data.name, analysis))
-        add("")
-        add("*Summary generated from rule-based findings.*")
-    add("")
-
-    add("## At a glance")
-    add("")
-    add(f"- IP packets: **{analysis.packet_count}** across **{len(analysis.hosts)}** hosts")
-    add(f"- HTTP requests: **{analysis.request_count}** in **{len(analysis.windows)}** activity window(s)")
-    add(f"- First / last HTTP request: {_when(analysis.first_seen)} / {_when(analysis.last_seen)}")
     add(
-        f"- Findings: **{counts['HIGH']} high**, **{counts['MEDIUM']} medium**, "
-        f"{counts['LOW']} low, {counts['INFO']} info"
+        md_table(
+            ["Item", "Detail"],
+            [
+                ["Subject", f"Packet capture `{data.name}`"],
+                ["Report date", datetime.now().strftime("%Y-%m-%d %H:%M")],
+                ["Activity period", period],
+                ["Overall risk", f"**{risk}**"],
+                ["Findings", f"{counts['HIGH']} high, {counts['MEDIUM']} medium, {counts['LOW']} low, {counts['INFO']} informational"],
+                ["Source data", sources],
+                ["AI-assisted narrative", f"`{model}`" if insights else f"Not included ({short_note})"],
+            ],
+        )
     )
     add("")
 
-    # ---- Findings --------------------------------------------------------- #
-    add("## Key findings")
+    # ---- 1. Executive summary -------------------------------------------- #
+    add("## 1. Executive Summary")
+    add("")
+    if insights and insights.executive_summary:
+        add(insights.executive_summary)
+    else:
+        add(local_summary(data.name, analysis))
+    add("")
+    add(f"**Overall risk: {risk}.** {rationale}".strip())
+    add("")
+    important = [f for f in analysis.findings if f.severity in ("HIGH", "MEDIUM")]
+    if important:
+        add("Key issues:")
+        add("")
+        out.extend(f"- **[{f.severity}]** {f.title}" for f in important)
+        add("")
+    add(
+        "Sections 3 and 4 list every finding with its evidence and fix. "
+        "Section 7 is the prioritized action list."
+    )
+    add("")
+
+    # ---- 2. Scope and methodology ---------------------------------------- #
+    add("## 2. Scope and Methodology")
+    add("")
+    add("**Scope**")
+    add("")
+    add(f"- Capture analyzed: `{data.name}`")
+    add(
+        f"- {analysis.packet_count} IP packets between {len(analysis.hosts)} hosts, and "
+        f"{analysis.request_count} HTTP endpoint requests (GET, PUT, POST, DELETE)."
+    )
+    add("- Encrypted traffic (HTTPS) is outside the scope: it cannot be read from a capture.")
+    add("")
+    add("**Method**")
+    add("")
+    add("- Every packet is analyzed locally, offline and without AI.")
+    add(
+        "- Findings come from fixed rules: known attack-tool signatures in the User-Agent, "
+        "SQL injection patterns, repeated POSTs to one endpoint, and unencrypted web traffic."
+    )
+    add(
+        "- The AI step, when enabled, only sees the endpoint requests and the rule-based findings. "
+        "It writes the narrative; it does not create findings."
+    )
+    add("")
+    add("**Severity ratings**")
+    add("")
+    add(md_table(["Severity", "Meaning"], [[RISK_LABEL[s], SEVERITY_MEANING[s]] for s in SEVERITY_ORDER]))
+    add("")
+
+    # ---- 3. Summary of findings ------------------------------------------ #
+    add("## 3. Summary of Findings")
+    add("")
+    if analysis.findings:
+        rows = [
+            [ids[id(f)], RISK_LABEL[f.severity], f.title, ", ".join(f.affected) or "-"]
+            for f in analysis.findings
+        ]
+        add(md_table(["ID", "Severity", "Finding", "Affected"], rows))
+    else:
+        add("No findings were triggered by the available data.")
+    add("")
+
+    # ---- 4. Detailed findings -------------------------------------------- #
+    add("## 4. Detailed Findings")
     add("")
     if analysis.findings:
         for finding in analysis.findings:
-            add(f"### [{finding.severity}] {finding.title}")
+            add(f"### {ids[id(finding)]}: {finding.title}")
+            add("")
+            add(f"- **Severity:** {RISK_LABEL[finding.severity]}")
+            if finding.affected:
+                add(f"- **Affected:** {', '.join(finding.affected)}")
+            add("")
+            add("**Description**")
             add("")
             add(finding.detail)
-            if finding.evidence:
-                add("")
-                add("Evidence:")
-                add("")
-                out.extend(f"- `{line}`" for line in finding.evidence)
             add("")
-            add(f"**Recommended:** {finding.recommendation}")
+            if finding.evidence:
+                add("**Evidence**")
+                add("")
+                add("```text")
+                out.extend(finding.evidence)
+                add("```")
+                add("")
+            if finding.impact:
+                add("**Impact**")
+                add("")
+                add(finding.impact)
+                add("")
+            add("**Recommendation**")
+            add("")
+            add(finding.recommendation)
             add("")
     else:
-        add("No rule-based findings were triggered by the available data.")
+        add("None.")
         add("")
 
-    # ---- Timeline --------------------------------------------------------- #
-    add("## What happened")
+    # ---- 5. Timeline ------------------------------------------------------ #
+    add("## 5. Timeline of Events")
     add("")
     if insights and insights.what_happened:
         out.extend(f"- {line}" for line in insights.what_happened)
@@ -477,8 +587,8 @@ def render_report(
         add("No timestamped HTTP activity was available.")
     add("")
 
-    # ---- Hosts ------------------------------------------------------------ #
-    add("## Hosts")
+    # ---- 6. Affected assets ---------------------------------------------- #
+    add("## 6. Hosts Involved")
     add("")
     if analysis.hosts:
         rows = [
@@ -496,8 +606,43 @@ def render_report(
         add("No hosts found.")
     add("")
 
-    # ---- Traffic ---------------------------------------------------------- #
-    add("## Traffic breakdown")
+    # ---- 7. Recommendations ---------------------------------------------- #
+    add("## 7. Recommendations")
+    add("")
+    seen: set[str] = set()
+    step = 1
+    for finding in analysis.findings:
+        if finding.recommendation in seen:
+            continue
+        seen.add(finding.recommendation)
+        add(f"{step}. **[{RISK_LABEL[finding.severity]}]** ({ids[id(finding)]}) {finding.recommendation}")
+        step += 1
+    if not seen:
+        add("No actions triggered by the findings.")
+    add("")
+
+    if insights and insights.recommendations:
+        add("Additional AI suggestions, most urgent first:")
+        add("")
+        for rec in insights.recommendations:
+            reason = f" {rec.reason}" if rec.reason else ""
+            add(f"- **[{rec.priority or 'N/A'}]** {rec.action}{reason}")
+        add("")
+
+    if insights and insights.open_questions:
+        add("**Further investigation.** The data cannot answer these; check them next:")
+        add("")
+        out.extend(f"- {question}" for question in insights.open_questions)
+        add("")
+
+    # ---- 8. Limitations --------------------------------------------------- #
+    add("## 8. Limitations")
+    add("")
+    out.extend(f"- {note}" for note in analysis.limits)
+    add("")
+
+    # ---- Appendices ------------------------------------------------------- #
+    add("## Appendix A: Traffic Statistics")
     add("")
     if analysis.protocols:
         rows = [
@@ -513,16 +658,10 @@ def render_report(
         add("No packet-level data was available.")
     add("")
 
-    # ---- HTTP ------------------------------------------------------------- #
-    add("## HTTP activity")
+    add("## Appendix B: HTTP Activity")
     add("")
     if analysis.request_count:
-        add(
-            md_table(
-                ["Method", "Requests"],
-                [[method, count] for method, count in analysis.methods.most_common()],
-            )
-        )
+        add(md_table(["Method", "Requests"], [[m, n] for m, n in analysis.methods.most_common()]))
         add("")
         add("Requested sites (Host header):")
         add("")
@@ -544,44 +683,7 @@ def render_report(
         else:
             add("No response codes were recorded.")
     else:
-        add("No HTTP requests were available.")
-    add("")
-
-    # ---- Actions ---------------------------------------------------------- #
-    add("## Recommended actions")
-    add("")
-    seen: set[str] = set()
-    step = 1
-    for finding in analysis.findings:
-        if finding.recommendation in seen:
-            continue
-        seen.add(finding.recommendation)
-        add(f"{step}. **[{finding.severity}]** {finding.recommendation}")
-        step += 1
-    if not seen:
-        add("No actions triggered by the findings.")
-    add("")
-
-    if insights and insights.recommendations:
-        add("Additional AI suggestions, most urgent first:")
-        add("")
-        for rec in insights.recommendations:
-            reason = f" {rec.reason}" if rec.reason else ""
-            add(f"- **[{rec.priority.upper() or 'N/A'}]** {rec.action}{reason}")
-        add("")
-
-    if insights and insights.open_questions:
-        add("## Open questions")
-        add("")
-        add("The data cannot answer these; check them next:")
-        add("")
-        out.extend(f"- {question}" for question in insights.open_questions)
-        add("")
-
-    # ---- Limits ----------------------------------------------------------- #
-    add("## Data notes and limits")
-    add("")
-    out.extend(f"- {note}" for note in analysis.limits)
+        add("No HTTP endpoint requests were available.")
     add("")
 
     return "\n".join(out)
@@ -689,21 +791,26 @@ def main(argv: list[str] | None = None) -> int:
         data = load_capture(name, files.get("basic"), files.get("http"))
         analysis = analyze(data)
         insights: AIInsights | None = None
+        capture_note = ai_note
 
-        if client:
+        if client and not analysis.request_count:
+            # Nothing hit an endpoint, so there is nothing worth paying to summarize.
+            capture_note = "no GET/PUT/POST/DELETE endpoint requests found, so the AI step was skipped"
+            LOGGER.info("%s: %s.", name, capture_note)
+        elif client:
             try:
                 insights = client.summarize(build_digest(data, analysis), analysis.known_ips)
             except FatalAPIError as exc:
-                ai_note = str(exc)
+                ai_note = capture_note = str(exc)
                 LOGGER.warning("AI step disabled for this run: %s", ai_note)
                 client = None  # every remaining capture would fail the same way
             except AIError as exc:
-                ai_note = str(exc)
-                LOGGER.warning("No AI narrative for %s: %s", name, ai_note)
+                capture_note = str(exc)
+                LOGGER.warning("No AI narrative for %s: %s", name, capture_note)
 
         report_path = output_folder / f"{safe_filename(name)}_report.md"
         report_path.write_text(
-            render_report(data, analysis, insights, ai_note, model), encoding="utf-8"
+            render_report(data, analysis, insights, capture_note, model), encoding="utf-8"
         )
         written += 1
         LOGGER.info(

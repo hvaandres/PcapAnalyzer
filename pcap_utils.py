@@ -1,5 +1,6 @@
 """Helpers shared by the PcapAnalyzer scripts."""
 
+import re
 from pathlib import Path
 
 # Resolved from this file, not the shell's working directory, so the scripts
@@ -9,6 +10,12 @@ DEFAULT_INPUT_DIR = BASE_DIR / "pcap_file"
 DEFAULT_OUTPUT_DIR = BASE_DIR / "Examples_Outputs"
 
 PCAP_PATTERNS = ("*.pcap", "*.pcapng")
+
+# Only HTTP requests that hit an endpoint with one of these methods are kept in
+# the HTTP report and sent to the AI. Everything else in the capture is still
+# analyzed locally (free), but never billed.
+ENDPOINT_METHODS = ("GET", "PUT", "POST", "DELETE")
+ENDPOINT_REQUEST = re.compile(r"(GET|PUT|POST|DELETE)\s+(\S+)\s+HTTP/")
 
 # Lower-case substrings that suggest SQL injection. They are matched against the
 # URL-decoded request, because form posts encode quotes and spaces

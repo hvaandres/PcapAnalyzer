@@ -1,7 +1,8 @@
 # This code will analyze your pcap file and generate a report.
 # You have a section to select the pcap file you want to analyze and another section to select the report file name you want to generate.
 # The analyze_packet function will extract the source IP address, destination IP address, and protocol of each packet.
-# If the packet has an HTTP payload, it will extract the HTTP method (GET or POST) and use that as the protocol instead.
+# Only packets carrying an HTTP request to an endpoint (GET, PUT, POST or DELETE) are kept; these are the only
+# records the AI step ever sees.
 # You will also have a potential to select the packet you want to analyze.
 
 import argparse
@@ -16,6 +17,7 @@ import scapy.all as scapy
 from pcap_utils import (
     DEFAULT_INPUT_DIR,
     DEFAULT_OUTPUT_DIR,
+    ENDPOINT_REQUEST,
     SQL_PATTERNS as SHARED_SQL_PATTERNS,
     find_pcap_files,
     next_report_path,
@@ -54,10 +56,7 @@ class PcapAnalyzer:
     def extract_http_data(self, payload):
         """Extract HTTP request and response information."""
         return {
-            "request": re.search(
-                r"(GET|POST)\s+(.*?)\s+HTTP",
-                payload
-            ),
+            "request": ENDPOINT_REQUEST.match(payload),
             "user": re.search(
                 r"(?i)(?:user|username)=([^&\s]+)",
                 payload
@@ -103,7 +102,8 @@ class PcapAnalyzer:
 
         payload = self.extract_payload(packet)
 
-        if not re.search(r"\b(GET|POST)\b", payload):
+        # Keep only requests to an endpoint (GET/PUT/POST/DELETE).
+        if not ENDPOINT_REQUEST.match(payload):
             return None
 
         return {

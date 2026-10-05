@@ -12,6 +12,7 @@ import scapy.all as scapy
 from pcap_utils import (
     DEFAULT_INPUT_DIR,
     DEFAULT_OUTPUT_DIR,
+    ENDPOINT_REQUEST,
     find_pcap_files,
     next_report_path,
     resolve_path,
@@ -38,10 +39,9 @@ def describe_packet(packet):
     # Upgrade the label when the TCP payload looks like an HTTP request.
     if packet.haslayer(scapy.Raw) and packet.haslayer(scapy.TCP):
         payload = packet[scapy.Raw].load.decode(errors="ignore")
-        if payload.startswith("GET"):
-            protocol = "HTTP GET"
-        elif payload.startswith("POST"):
-            protocol = "HTTP POST"
+        request = ENDPOINT_REQUEST.match(payload)
+        if request:
+            protocol = f"HTTP {request.group(1)}"
 
     return f"Source IP: {src_ip}, Destination IP: {dst_ip}, Protocol: {protocol}"
 
