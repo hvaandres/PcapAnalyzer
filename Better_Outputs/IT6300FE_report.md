@@ -3,18 +3,18 @@
 | Item | Detail |
 | --- | --- |
 | Subject | Packet capture `IT6300FE.pcap` |
-| Report date | 2026-10-04 18:52 |
+| Report date | 2026-10-04 18:57 |
 | Activity period | 2016-04-14 11:28:39 to 2016-11-29 13:22:46 (HTTP activity) |
 | Overall risk | **High** |
 | Findings | 2 high, 1 medium, 0 low, 0 informational |
-| Source data | `pcap_analyzed002.txt`, `pcap_http_analyzed002.txt` |
-| AI-assisted narrative | `gemini-3.1-flash-lite` |
+| Source data | `pcap_analyzed002.txt`, `pcap_http_analyzed.txt` |
+| AI-assisted narrative | Not included (disabled with --no-ai) |
 
 ## 1. Executive Summary
 
-Network analysis identified two distinct security events involving potential brute-force and SQL injection attempts. Host 161.28.112.67 used the Hydra tool to target 161.28.112.58, while host 161.28.112.66 sent SQL injection patterns to 161.28.112.43. These activities represent unauthorized attempts to interact with web services. The data provided cannot confirm if these attempts resulted in a successful compromise.
+IT6300FE.pcap contains 371 IP packets between 4 hosts and 31 HTTP requests in 2 burst(s) of activity, from 2016-04-14 11:28:39 to 2016-11-29 13:22:46. 2 high, 1 medium-severity finding(s): Attack tool detected: Hydra (161.28.112.67 -> 161.28.112.58); SQL injection indicators (161.28.112.66 -> 161.28.112.43); Web traffic is unencrypted (plain HTTP).
 
-**Overall risk: High.** The presence of automated brute-force tools and SQL injection patterns indicates active targeting of web infrastructure, which poses a significant risk to data integrity and account security.
+**Overall risk: High.** Rated on the most severe findings: 2 high and 1 medium-severity finding(s).
 
 Key issues:
 
@@ -124,11 +124,6 @@ Serve the application over HTTPS only, redirect HTTP to HTTPS, and mark session 
 
 ## 5. Timeline of Events
 
-- On 2016-04-14, host 161.28.112.66 sent 17 requests to 161.28.112.43, including three requests containing SQL injection patterns.
-- On 2016-11-29, host 161.28.112.67 sent 14 requests to 161.28.112.58 using the Hydra brute-force tool.
-
-*Narrative written by the AI; the table below is the underlying data.*
-
 | Start | End | Source -> Destination | Requests | Host header(s) | Notes |
 | --- | --- | --- | --- | --- | --- |
 | 2016-04-14 11:28:39 | 2016-04-14 11:30:08 | 161.28.112.66 -> 161.28.112.43 | 17 | www.badstore.net, www.sql.net | 3 SQL injection indicator(s) |
@@ -148,17 +143,6 @@ Serve the application over HTTPS only, redirect HTTP to HTTPS, and mark session 
 1. **[High]** (F-01) Block or rate-limit 161.28.112.67. Review authentication and access logs on 161.28.112.58 for the same period to see whether any attempt succeeded, and enforce account lockout and multi-factor authentication.
 2. **[High]** (F-02) Check the endpoint(s) /cgi-bin/badstore.cgi, /sqlInjection.php on 161.28.112.43: use parameterized queries, validate input, and inspect database and web logs for unexpected logins or data access around that time.
 3. **[Medium]** (F-03) Serve the application over HTTPS only, redirect HTTP to HTTPS, and mark session cookies Secure and HttpOnly.
-
-Additional AI suggestions, most urgent first:
-
-- **[High]** Implement a Web Application Firewall (WAF) to detect and block common injection patterns and automated scanning tools. This provides a proactive layer of defense against the specific attack vectors identified in the traffic.
-- **[Medium]** Conduct a vulnerability scan on the targeted web servers to identify and patch known software flaws. The attackers are specifically targeting known endpoints, suggesting these areas may have exploitable weaknesses.
-
-**Further investigation.** The data cannot answer these; check them next:
-
-- Did the SQL injection attempts result in unauthorized database queries or data exfiltration?
-- Were any of the brute-force attempts against 161.28.112.58 successful in gaining valid user credentials?
-- What specific data was accessed or returned by the server in response to the malicious payloads?
 
 ## 8. Limitations
 
